@@ -61,36 +61,36 @@ you can check the demo app for a typical use with the couple glfw/glad
  
 ## What to do in code
 
-You must call 'AIGPNewFrame' one time per frame. 
+You must call 'IAGPNewFrame' one time per frame. 
 This must be the root of your gpu metric scope
 
 ex :
 ```cpp
-AIGPNewFrame("GPU Frame", "GPU Frame");  // a main Zone is always needed                
+IAGPNewFrame("GPU Frame", "GPU Frame");  // a main Zone is always needed                
 ```
 
-then you msut call 'AIGPScoped' for each zones you want to measure
+then you msut call 'IAGPScoped' for each zones you want to measure
 
 ex :
 ```cpp
-AIGPScoped("render_imgui", "ImGui");
+IAGPScoped("render_imgui", "ImGui");
 {
-	AIGPScoped("Opengl", "glViewport");
+	IAGPScoped("Opengl", "glViewport");
 	glViewport(0, 0, display_w, display_h);
 }
 
 {
-	AIGPScoped("Opengl", "glClearColor");
+	IAGPScoped("Opengl", "glClearColor");
 	glClearColor(0.3f, 0.3f, 0.3f, 0.3f);
 }
 
 {
-	AIGPScoped("Opengl", "glClear");
+	IAGPScoped("Opengl", "glClear");
 	glClear(GL_COLOR_BUFFER_BIT);
 }
 
 {
-	AIGPScoped("ImGui", "RenderDrawData");
+	IAGPScoped("ImGui", "RenderDrawData");
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }     
 ```
@@ -98,24 +98,24 @@ AIGPScoped("render_imgui", "ImGui");
 you can also use the variadic form :
 
 ```cpp
-AIGPScoped("Opengl", "glGenerateMipmap %u", m_TexId);
+IAGPScoped("Opengl", "glGenerateMipmap %u", m_TexId);
 ```
 
 these functions must be included in a scope.
 
 you cant put two function in the same scope since the first metric measure 
 
-will be done on constructor of AIGPScoped and the second metric measure 
+will be done on constructor of IAGPScoped and the second metric measure 
 
-will be done on destructor of AIGPScoped
+will be done on destructor of IAGPScoped
 
-finally you must collect all gpu metrics out of the scope of 'AIGPNewFrame' 
+finally you must collect all gpu metrics out of the scope of 'IAGPNewFrame' 
 
-by calling 'AIGPCollect' one time per frame
+by calling 'IAGPCollect' one time per frame
 
 ex :
 ```cpp
-AIGPCollect;  // collect all measure queries out of Main Frame               
+IAGPCollect;  // collect all measure queries out of Main Frame               
 ```
 
 full sample from the DemoApp :
@@ -123,10 +123,10 @@ full sample from the DemoApp :
 ```cpp 
 while (!glfwWindowShouldClose(window)) {
     {
-        AIGPNewFrame("GPU Frame", "GPU Frame");  // a main Zone is always needed
+        IAGPNewFrame("GPU Frame", "GPU Frame");  // a main Zone is always needed
 	glfwMakeContextCurrent(window);
 
-	render_shaders(); // many AIGPScoped are caleed in this function
+	render_shaders(); // many IAGPScoped are caleed in this function
 
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
@@ -139,24 +139,24 @@ while (!glfwWindowShouldClose(window)) {
 	// GPU Zone : Rendering
 	glfwMakeContextCurrent(window);
 	{
-            AIGPScoped("render_imgui", "ImGui");
+            IAGPScoped("render_imgui", "ImGui");
             glViewport(0, 0, display_w, display_h);
             glClearColor(0.3f, 0.3f, 0.3f, 0.3f);
             glClear(GL_COLOR_BUFFER_BIT);
 
             {
-	        AIGPScoped("ImGui", "RenderDrawData");
+	        IAGPScoped("ImGui", "RenderDrawData");
                 ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
             }
 	}
 
 	{
-            AIGPScoped("Opengl", "glfwSwapBuffers");
+            IAGPScoped("Opengl", "glfwSwapBuffers");
             glfwSwapBuffers(window);
 	}
     }
 
-    AIGPCollect;  // collect all measure queries out of Main Frame
+    IAGPCollect;  // collect all measure queries out of Main Frame
 }      
 ```
 

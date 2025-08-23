@@ -63,18 +63,18 @@ SOFTWARE.
 
 // a main zone for the frame must always been defined for the frame
 #define IAGPNewFrame(section, fmt, ...)  \
-    auto __IAGP__ScopedMainZone = iagp::InAppGpuScopedZone(true, nullptr, section, fmt, ##__VA_ARGS__); \
+    auto __IAGP__ScopedMainZone = iagp::InAppGpuScopedZone(iagp::InAppGpuProfiler::ref(), true, nullptr, section, fmt, ##__VA_ARGS__); \
     (void)__IAGP__ScopedMainZone
 
 #define IAGPScoped(section, fmt, ...)                                                          \
-    auto __IAGP__ScopedSubZone = iagp::InAppGpuScopedZone(false, nullptr, section, fmt, ##__VA_ARGS__); \
+    auto __IAGP__ScopedSubZone = iagp::InAppGpuScopedZone(iagp::InAppGpuProfiler::ref(), false, nullptr, section, fmt, ##__VA_ARGS__); \
     (void)__IAGP__ScopedSubZone
 
 #define IAGPScopedPtr(ptr, section, fmt, ...)                                                                   \
-    auto __IAGP__ScopedSubZone = iagp::InAppGpuScopedZone(false, ptr, section, fmt, ##__VA_ARGS__); \
+    auto __IAGP__ScopedSubZone = iagp::InAppGpuScopedZone(iagp::InAppGpuProfiler::ref(), false, ptr, section, fmt, ##__VA_ARGS__); \
     (void)__IAGP__ScopedSubZone
 
-#define IAGPCollect iagp::InAppGpuProfiler::Instance()->Collect()
+#define IAGPCollect iagp::InAppGpuProfiler::ref().Collect()
 
 #ifndef IAGP_RECURSIVE_LEVELS_COUNT
 #define IAGP_RECURSIVE_LEVELS_COUNT 20U
@@ -265,6 +265,7 @@ private:
     IAGPQueryZonePtr m_GetQueryZoneFromDepth(GLuint vDepth);
 };
 
+class InAppGpuProfiler;
 class IN_APP_GPU_PROFILER_API InAppGpuScopedZone {
 public:
     static GLuint sCurrentDepth;  // current depth catched by Profiler
@@ -273,8 +274,11 @@ public:
 public:
     IAGPQueryZonePtr queryPtr = nullptr;
 
+private:
+    InAppGpuProfiler& m_profiler;
+
 public:
-    InAppGpuScopedZone(const bool vIsRoot, const void* vPtr, const std::string& vSection, const char* fmt, ...);
+    InAppGpuScopedZone(InAppGpuProfiler& vProfiler, const bool vIsRoot, const void* vPtr, const std::string& vSection, const char* fmt, ...);
     ~InAppGpuScopedZone();
 };
 
@@ -318,12 +322,28 @@ private:
     void m_DrawMenuBar();
 
 public:
-    static InAppGpuProfiler* Instance() {
-        static InAppGpuProfiler _instance;
-        return &_instance;
+    static std::unique_ptr<InAppGpuProfiler>& initSingleton(InAppGpuProfiler* vCopy = nullptr, bool vForce = false) {
+        static auto mp_instance = std::unique_ptr<InAppGpuProfiler>(new InAppGpuProfiler());
+        static std::unique_ptr<InAppGpuProfiler> mp_instance_copy;
+        if (vCopy != nullptr || vForce) {
+            if (vCopy != nullptr) {
+                mp_instance_copy = std::unique_ptr<InAppGpuProfiler>(vCopy);
+            } else {
+                mp_instance_copy.release();  // frees the internal borrowed pointer without deletion
+            }
+        }
+        if (mp_instance_copy != nullptr) {
+            return mp_instance_copy;
+        }
+        return mp_instance;
     }
-
-protected:
+    static InAppGpuProfiler& ref() { return *initSingleton().get(); }
+    static void unitSingleton() {
+        initSingleton(nullptr, true);  // frees the borrowed pointer in case
+        initSingleton().reset();       // else the reset with destroy the borrowed pointer
+    }
+    
+public:
     InAppGpuProfiler();
     InAppGpuProfiler(const InAppGpuProfiler&);
     InAppGpuProfiler& operator=(const InAppGpuProfiler&);

@@ -965,7 +965,7 @@ void InAppGpuProfiler::DrawFlamGraphChilds(ImGuiWindowFlags vFlags) {
             ImGui::SetNextWindowSizeConstraints(IAGP_SUB_WINDOW_MIN_SIZE, ImGui::GetIO().DisplaySize);
             if (m_ImGuiBeginFunctor != nullptr && m_ImGuiBeginFunctor(ptr->imGuiTitle.c_str(), &opened, vFlags)) {
                 if (sIsActive) {
-                    ptr->DrawFlamGraph(iagp::InAppGpuProfiler::Instance()->GetGraphTypeRef(), m_SelectedQuery);
+                    ptr->DrawFlamGraph(GetGraphTypeRef(), m_SelectedQuery);
                 }
             }
             if (m_ImGuiEndFunctor != nullptr) {
@@ -1095,7 +1095,8 @@ uint32_t InAppGpuScopedZone::sCurrentDepth = 0U;
 uint32_t InAppGpuScopedZone::sMaxDepth = 0U;
 
 // SCOPED ZONE
-InAppGpuScopedZone::InAppGpuScopedZone(const bool vIsRoot, const void* vPtr, const std::string& vSection, const char* fmt, ...) {
+InAppGpuScopedZone::InAppGpuScopedZone(InAppGpuProfiler& vProfiler, const bool vIsRoot, const void* vPtr, const std::string& vSection, const char* fmt, ...)
+    : m_profiler(vProfiler) {
     if (InAppGpuProfiler::sIsActive) {
         va_list args;
         va_start(args, fmt);
@@ -1103,15 +1104,17 @@ InAppGpuScopedZone::InAppGpuScopedZone(const bool vIsRoot, const void* vPtr, con
         const int w = vsnprintf(TempBuffer, 256, fmt, args);
         va_end(args);
         if (w) {
-            auto context_ptr = InAppGpuProfiler::Instance()->GetContextPtr(IAGP_GET_CURRENT_CONTEXT());
+            auto context_ptr = m_profiler.GetContextPtr(IAGP_GET_CURRENT_CONTEXT());
             if (context_ptr != nullptr) {
                 const auto& label = std::string(TempBuffer, (size_t)w);
                 queryPtr = context_ptr->GetQueryZoneForName(vPtr, label, vSection, vIsRoot);
                 if (queryPtr != nullptr) {
                     glQueryCounter(queryPtr->ids[0], GL_TIMESTAMP);
 #ifdef IAGP_DEBUG_MODE_LOGGING
+                    // clang-format off
                     IAGP_DEBUG_MODE_LOGGING("%*s begin : [%u:%u] (depth:%u) (%s)",  //
                                        queryPtr->depth, "", queryPtr->ids[0], queryPtr->ids[1], queryPtr->depth, label.c_str());
+                    // clang-format on
 #endif
                     sCurrentDepth++;
                 }
@@ -1121,21 +1124,21 @@ InAppGpuScopedZone::InAppGpuScopedZone(const bool vIsRoot, const void* vPtr, con
 }
 
 InAppGpuScopedZone::~InAppGpuScopedZone() {
-    if (InAppGpuProfiler::sIsActive) {
-        if (queryPtr != nullptr) {
+    if (queryPtr != nullptr) {
 #ifdef IAGP_DEBUG_MODE_LOGGING
-            if (queryPtr->depth > 0) {
-                IAGP_DEBUG_MODE_LOGGING("%*s end : [%u:%u] (depth:%u)",  //
-                                        (queryPtr->depth - 1U), "", queryPtr->ids[0], queryPtr->ids[1], queryPtr->depth);
-            } else {
-                IAGP_DEBUG_MODE_LOGGING("end : [%u:%u] (depth:%u)",  //
-                                        queryPtr->ids[0], queryPtr->ids[1], 0);
-            }
-#endif
-            glQueryCounter(queryPtr->ids[1], GL_TIMESTAMP);
-            ++queryPtr->current_count;
-            --sCurrentDepth;
+        // clang-format off
+        if (queryPtr->depth > 0) {
+            IAGP_DEBUG_MODE_LOGGING("%*s end : [%u:%u] (depth:%u)",  
+                                    (queryPtr->depth - 1U), "", queryPtr->ids[0], queryPtr->ids[1], queryPtr->depth);
+        } else {
+            IAGP_DEBUG_MODE_LOGGING("end : [%u:%u] (depth:%u)",  
+                                    queryPtr->ids[0], queryPtr->ids[1], 0);
         }
+        // clang-format on
+#endif
+        glQueryCounter(queryPtr->ids[1], GL_TIMESTAMP);
+        ++queryPtr->current_count;
+        --sCurrentDepth;
     }
 }
 
